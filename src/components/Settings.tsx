@@ -70,9 +70,11 @@ export default function Settings({ onSettingsSaved }: SettingsProps) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [availableApps, setAvailableApps] = useState<string[]>([]);
 
   useEffect(() => {
     loadSettings();
+    loadAvailableApplications();
   }, []);
 
   const loadSettings = async () => {
@@ -84,6 +86,22 @@ export default function Settings({ onSettingsSaved }: SettingsProps) {
       setSettings(defaultSettings);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAvailableApplications = async () => {
+    try {
+      const apps = await invoke<Array<{name: string}>>('get_applications');
+      const appNames = apps.map(app => app.name);
+      setAvailableApps(appNames);
+    } catch (error) {
+      console.error('Failed to load available applications:', error);
+      // Fallback to hardcoded list if loading fails
+      setAvailableApps([
+        'Claude Desktop', 'Claude Code', 'Cursor', 'Warp',
+        'Visual Studio Code', 'Amazon Q Developer', 'IntelliJ IDEA',
+        'PHPStorm', 'WebStorm', 'PyCharm', 'Zed', 'Continue.dev'
+      ]);
     }
   };
 
@@ -357,18 +375,9 @@ export default function Settings({ onSettingsSaved }: SettingsProps) {
               >
                 <option value="none">None (Manual Sync Only)</option>
                 <option value="MCP Control Lite">MCP Control Lite</option>
-                <option value="Claude Desktop">Claude Desktop</option>
-                <option value="Claude Code">Claude Code</option>
-                <option value="Cursor">Cursor</option>
-                <option value="Warp">Warp</option>
-                <option value="Visual Studio Code">Visual Studio Code</option>
-                <option value="Amazon Q Developer">Amazon Q Developer</option>
-                <option value="IntelliJ IDEA">IntelliJ IDEA</option>
-                <option value="PHPStorm">PHPStorm</option>
-                <option value="WebStorm">WebStorm</option>
-                <option value="PyCharm">PyCharm</option>
-                <option value="Zed">Zed</option>
-                <option value="Continue.dev">Continue.dev</option>
+                {availableApps.map(app => (
+                  <option key={app} value={app}>{app}</option>
+                ))}
               </select>
             </label>
 

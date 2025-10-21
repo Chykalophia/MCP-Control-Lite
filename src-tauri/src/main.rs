@@ -977,45 +977,75 @@ async fn save_server_config(server_id: String, application: String, config: serd
     Err(format!("Application '{}' not found or not configured", application))
 }
 
+/// Constants for special application names
+const MCP_CONTROL_LITE_NAME: &str = "MCP Control Lite";
+const NONE_SOURCE: &str = "none";
+
+/// Determine if an application uses nested mcp.servers structure
+fn uses_nested_config_structure(profile_id: &str) -> bool {
+    // Configuration-based approach: check if the profile ID matches known patterns
+    profile_id == "cursor" ||
+    profile_id == "warp" ||
+    profile_id.starts_with("jetbrains-")
+}
+
+/// Read MCP Control Lite's internal configuration
+async fn read_mcp_control_lite_config() -> Result<serde_json::Map<String, serde_json::Value>, String> {
+    let config_dir = dirs::config_dir()
+        .ok_or("Could not find config directory")?
+        .join("mcp-control");
+    let mcp_config_path = config_dir.join("mcp_servers.json");
+
+    if !mcp_config_path.exists() {
+        return Err("MCP Control Lite has no saved configuration".to_string());
+    }
+
+    let content = tokio::fs::read_to_string(&mcp_config_path).await
+        .map_err(|e| format!("Failed to read MCP Control Lite config: {}", e))?;
+    let config: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse MCP Control Lite config: {}", e))?;
+
+    config.get("mcpServers")
+        .and_then(|s| s.as_object())
+        .ok_or("No mcpServers found in MCP Control Lite config")?
+        .clone()
+        .into_iter()
+        .collect::<serde_json::Map<_, _>>()
+        .into()
+}
+
+/// Check if the source app is MCP Control Lite
+fn is_mcp_control_lite(app_name: &str) -> bool {
+    app_name == MCP_CONTROL_LITE_NAME
+}
+
 #[tauri::command]
 async fn sync_from_source(source_app: String) -> Result<String, String> {
     log::info!("Syncing all apps from source: {}", source_app);
 
-    if source_app == "none" {
+    if source_app == NONE_SOURCE {
         return Err("No source of truth configured".to_string());
     }
 
     let mut detector = ApplicationDetector::new().map_err(|e| e.to_string())?;
     let results = detector.detect_all_applications().await.map_err(|e| e.to_string())?;
 
-    // Find the source application
-    let source_result = results.iter()
-        .find(|r| (r.profile.name == source_app || source_app == "MCP Control Lite") && r.detected)
-        .ok_or_else(|| format!("Source application '{}' not found or not detected", source_app))?;
+    // Find the source application (special handling for MCP Control Lite)
+    let is_internal_source = is_mcp_control_lite(&source_app);
+    let source_result = if !is_internal_source {
+        Some(results.iter()
+            .find(|r| r.profile.name == source_app && r.detected)
+            .ok_or_else(|| format!("Source application '{}' not found or not detected", source_app))?)
+    } else {
+        None
+    };
 
     // Read source configuration
-    let source_servers = if source_app == "MCP Control Lite" {
-        // MCP Control Lite has its own config storage
-        let config_dir = dirs::config_dir()
-            .ok_or("Could not find config directory")?
-            .join("mcp-control");
-        let mcp_config_path = config_dir.join("mcp_servers.json");
-
-        if mcp_config_path.exists() {
-            let content = tokio::fs::read_to_string(&mcp_config_path).await
-                .map_err(|e| format!("Failed to read MCP Control Lite config: {}", e))?;
-            let config: serde_json::Value = serde_json::from_str(&content)
-                .map_err(|e| format!("Failed to parse MCP Control Lite config: {}", e))?;
-
-            config.get("mcpServers")
-                .and_then(|s| s.as_object())
-                .ok_or("No mcpServers found in MCP Control Lite config")?
-                .clone()
-        } else {
-            return Err("MCP Control Lite has no saved configuration".to_string());
-        }
+    let source_servers = if is_internal_source {
+        read_mcp_control_lite_config().await?
     } else {
         // Read from detected app's config
+        let source_result = source_result.unwrap();
         let config_path = source_result.found_paths.config_file.as_ref()
             .ok_or("Source application has no config file")?;
 
@@ -1047,12 +1077,8 @@ async fn sync_from_source(source_app: String) -> Result<String, String> {
             let mut target_config: serde_json::Value = serde_json::from_str(&content)
                 .map_err(|e| format!("Failed to parse {}: {}", result.profile.name, e))?;
 
-            // Determine config structure (direct mcpServers vs nested mcp.servers)
-            let uses_nested = result.profile.id == "cursor" ||
-                             result.profile.id == "warp" ||
-                             result.profile.id.starts_with("jetbrains-");
-
-            if uses_nested {
+            // Use configuration-based approach to determine structure
+            if uses_nested_config_structure(&result.profile.id) {
                 // Ensure mcp.servers structure exists
                 if target_config.get("mcp").is_none() {
                     target_config["mcp"] = serde_json::json!({});
@@ -1064,7 +1090,7 @@ async fn sync_from_source(source_app: String) -> Result<String, String> {
                 // Replace servers
                 target_config["mcp"]["servers"] = serde_json::json!(source_servers);
             } else {
-                // Direct mcpServers structure (Claude Desktop, Claude Code, Amazon Q, etc.)
+                // Direct mcpServers structure
                 if target_config.get("mcpServers").is_none() {
                     target_config["mcpServers"] = serde_json::json!({});
                 }

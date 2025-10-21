@@ -199,7 +199,7 @@ mod tests {
                     "command": "node",
                     "args": ["server.js"],
                     "env": {
-                        "API_KEY": "test"
+                        "API_KEY": "your-api-key-here"
                     }
                 }
             }

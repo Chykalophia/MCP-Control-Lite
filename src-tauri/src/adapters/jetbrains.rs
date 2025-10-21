@@ -103,7 +103,7 @@ impl ApplicationAdapter for JetBrainsAdapter {
     }
 
     fn get_supported_formats(&self) -> Vec<ConfigFormat> {
-        vec![ConfigFormat::Json, ConfigFormat::Custom("XML".to_string())]
+        vec![ConfigFormat::Json]
     }
 
     fn get_name(&self) -> &str {
@@ -211,7 +211,7 @@ mod tests {
                         "command": "node",
                         "args": ["server.js"],
                         "env": {
-                            "API_KEY": "test"
+                            "API_KEY": "your-api-key-here"
                         }
                     }
                 }
