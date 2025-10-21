@@ -1141,6 +1141,31 @@ async fn get_mcp_control_config() -> Result<serde_json::Value, String> {
 }
 
 #[tauri::command]
+async fn analyze_server(package_identifier: String) -> Result<serde_json::Value, String> {
+    use mcpctl_lib::analysis::ServerAnalyzer;
+
+    log::info!("Analyzing server package: {}", package_identifier);
+
+    let analyzer = ServerAnalyzer::new();
+
+    match analyzer.analyze_package(&package_identifier).await {
+        Ok(result) => {
+            log::info!("Analysis completed with confidence: {:.2}", result.confidence);
+            Ok(serde_json::json!({
+                "success": result.success,
+                "confidence": result.confidence,
+                "config": result.config,
+                "messages": result.messages
+            }))
+        }
+        Err(e) => {
+            log::error!("Failed to analyze server: {}", e);
+            Err(format!("Failed to analyze server: {}", e))
+        }
+    }
+}
+
+#[tauri::command]
 async fn export_logs() -> Result<(), String> {
     Ok(())
 }
@@ -1283,7 +1308,8 @@ Right-click for options")
                 create_server,
                 sync_from_source,
                 save_mcp_control_config,
-                get_mcp_control_config
+                get_mcp_control_config,
+                analyze_server
             ])
             .run(tauri::generate_context!())
             .expect("error while running tauri application");

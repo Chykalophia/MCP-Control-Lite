@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Save, RotateCcw, X, Settings, Shield, Link, Monitor, Code } from 'lucide-react';
+import { Save, RotateCcw, X, Settings, Shield, Link, Monitor, Code, Sparkles } from 'lucide-react';
 
 interface ServerConfig {
   name: string;
@@ -56,9 +56,11 @@ export default function ServerDetail({ serverId, serverName, application, onClos
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [activeTab, setActiveTab] = useState<'basic' | 'advanced' | 'dependencies' | 'applications' | 'editor'>('basic');
   const [message, setMessage] = useState<string | null>(null);
   const [jsonEditor, setJsonEditor] = useState<string>('');
+  const [analysisConfidence, setAnalysisConfidence] = useState<number | null>(null);
 
   useEffect(() => {
     if (!isNewServer) {
@@ -132,6 +134,69 @@ export default function ServerDetail({ serverId, serverName, application, onClos
       }, 1000);
     } catch (error) {
       setMessage(`Failed to delete server: ${error}`);
+    }
+  };
+
+  const autoDetectConfig = async () => {
+    setAnalyzing(true);
+    setMessage(null);
+    setAnalysisConfidence(null);
+
+    try {
+      // Use the server name as the package identifier
+      // User can change the name field if they want to analyze a different package
+      const packageId = config.name || serverName;
+
+      const result = await invoke<{
+        success: boolean;
+        confidence: number;
+        config: {
+          name: string;
+          description?: string;
+          command: string;
+          args: string[];
+          env: Record<string, { name: string; description?: string; required: boolean; default?: string; example?: string }>;
+          install_command?: string;
+          docs_url?: string;
+          author?: string;
+          version?: string;
+        };
+        messages: string[];
+      }>('analyze_server', { packageIdentifier: packageId });
+
+      if (result.success) {
+        // Convert env vars from detailed format to simple key-value
+        const envVars: Record<string, string> = {};
+        for (const [key, value] of Object.entries(result.config.env)) {
+          // Use example if available, otherwise empty string with comment about being required
+          envVars[key] = value.example || value.default || (value.required ? '/* REQUIRED */' : '');
+        }
+
+        // Update config with detected values
+        setConfig({
+          ...config,
+          name: result.config.name,
+          description: result.config.description || config.description,
+          command: result.config.command,
+          args: result.config.args,
+          env: envVars
+        });
+
+        setAnalysisConfidence(result.confidence);
+
+        const confidencePercent = (result.confidence * 100).toFixed(0);
+        setMessage(
+          `Configuration auto-detected with ${confidencePercent}% confidence! ` +
+          `Review the fields below and adjust as needed. ${result.messages.length > 0 ? `\n${result.messages.join(', ')}` : ''}`
+        );
+      } else {
+        setMessage('Failed to auto-detect configuration. Please fill in manually.');
+      }
+    } catch (error) {
+      console.error('Auto-detect failed:', error);
+      setMessage(`Auto-detection failed: ${error}. You can still configure manually.`);
+    } finally {
+      setAnalyzing(false);
     }
   };
 
@@ -277,13 +342,41 @@ export default function ServerDetail({ serverId, serverName, application, onClos
         </div>
 
         {message && (
-          <div style={{ 
+          <div style={{
             padding: '12px 20px',
             background: message.includes('Failed') ? '#ffebee' : '#e8f5e8',
             color: message.includes('Failed') ? '#c62828' : '#2e7d32',
             borderBottom: '1px solid var(--border-color)'
           }}>
-            {message}
+            <div>{message}</div>
+            {analysisConfidence !== null && (
+              <div style={{
+                marginTop: '8px',
+                fontSize: '13px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <strong>Confidence:</strong>
+                <div style={{
+                  flex: 1,
+                  height: '6px',
+                  background: '#ddd',
+                  borderRadius: '3px',
+                  overflow: 'hidden',
+                  maxWidth: '200px'
+                }}>
+                  <div style={{
+                    width: `${analysisConfidence * 100}%`,
+                    height: '100%',
+                    background: analysisConfidence > 0.7 ? '#4caf50' : analysisConfidence > 0.4 ? '#ff9800' : '#f44336',
+                    borderRadius: '3px',
+                    transition: 'width 0.3s ease'
+                  }} />
+                </div>
+                <span style={{ minWidth: '35px' }}>{(analysisConfidence * 100).toFixed(0)}%</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -794,15 +887,30 @@ export default function ServerDetail({ serverId, serverName, application, onClos
             <button
               onClick={resetConfig}
               className="btn btn-secondary"
-              disabled={saving}
+              disabled={saving || analyzing}
             >
               <RotateCcw size={16} style={{ marginRight: '8px' }} />
               Reset
             </button>
             <button
+              onClick={autoDetectConfig}
+              className="btn"
+              disabled={saving || analyzing || !config.name}
+              style={{
+                background: analyzing ? '#9c27b0' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                border: 'none',
+                opacity: (!config.name || analyzing) ? 0.6 : 1
+              }}
+              title="Auto-detect configuration from package name, README, or URL"
+            >
+              <Sparkles size={16} style={{ marginRight: '8px' }} />
+              {analyzing ? 'Analyzing...' : 'Auto-Detect'}
+            </button>
+            <button
               onClick={saveConfig}
               className="btn btn-primary"
-              disabled={saving}
+              disabled={saving || analyzing}
             >
               <Save size={16} style={{ marginRight: '8px' }} />
               {saving ? 'Saving...' : 'Save Configuration'}
