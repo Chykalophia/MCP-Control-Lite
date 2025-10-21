@@ -193,13 +193,21 @@ async fn get_settings() -> Result<serde_json::Value, String> {
             "backupFrequency": "weekly",
             "logLevel": "info",
             "developerMode": false,
+            "sourceOfTruth": "none",
+            "autoSync": false,
             "enabledApps": {
                 "Claude Desktop": true,
                 "Cursor": true,
                 "Amazon Q Developer": true,
                 "Visual Studio Code": true,
+                "Warp": true,
+                "Claude Code": true,
                 "Zed": false,
-                "Continue.dev": false
+                "Continue.dev": false,
+                "IntelliJ IDEA": false,
+                "PHPStorm": false,
+                "WebStorm": false,
+                "PyCharm": false
             }
         }))
     }
@@ -970,6 +978,169 @@ async fn save_server_config(server_id: String, application: String, config: serd
 }
 
 #[tauri::command]
+async fn sync_from_source(source_app: String) -> Result<String, String> {
+    log::info!("Syncing all apps from source: {}", source_app);
+
+    if source_app == "none" {
+        return Err("No source of truth configured".to_string());
+    }
+
+    let mut detector = ApplicationDetector::new().map_err(|e| e.to_string())?;
+    let results = detector.detect_all_applications().await.map_err(|e| e.to_string())?;
+
+    // Find the source application
+    let source_result = results.iter()
+        .find(|r| (r.profile.name == source_app || source_app == "MCP Control Lite") && r.detected)
+        .ok_or_else(|| format!("Source application '{}' not found or not detected", source_app))?;
+
+    // Read source configuration
+    let source_servers = if source_app == "MCP Control Lite" {
+        // MCP Control Lite has its own config storage
+        let config_dir = dirs::config_dir()
+            .ok_or("Could not find config directory")?
+            .join("mcp-control");
+        let mcp_config_path = config_dir.join("mcp_servers.json");
+
+        if mcp_config_path.exists() {
+            let content = tokio::fs::read_to_string(&mcp_config_path).await
+                .map_err(|e| format!("Failed to read MCP Control Lite config: {}", e))?;
+            let config: serde_json::Value = serde_json::from_str(&content)
+                .map_err(|e| format!("Failed to parse MCP Control Lite config: {}", e))?;
+
+            config.get("mcpServers")
+                .and_then(|s| s.as_object())
+                .ok_or("No mcpServers found in MCP Control Lite config")?
+                .clone()
+        } else {
+            return Err("MCP Control Lite has no saved configuration".to_string());
+        }
+    } else {
+        // Read from detected app's config
+        let config_path = source_result.found_paths.config_file.as_ref()
+            .ok_or("Source application has no config file")?;
+
+        let content = tokio::fs::read_to_string(config_path).await
+            .map_err(|e| format!("Failed to read source config: {}", e))?;
+        let config: serde_json::Value = serde_json::from_str(&content)
+            .map_err(|e| format!("Failed to parse source config: {}", e))?;
+
+        config.get("mcpServers")
+            .or_else(|| config.get("mcp").and_then(|m| m.get("servers")))
+            .and_then(|s| s.as_object())
+            .ok_or("No MCP servers found in source config")?
+            .clone()
+    };
+
+    let mut synced_apps = Vec::new();
+
+    // Sync to all other detected applications
+    for result in &results {
+        if result.profile.name == source_app || !result.detected {
+            continue;
+        }
+
+        if let Some(config_path) = &result.found_paths.config_file {
+            // Read target config
+            let content = tokio::fs::read_to_string(config_path).await
+                .map_err(|e| format!("Failed to read {}: {}", result.profile.name, e))?;
+
+            let mut target_config: serde_json::Value = serde_json::from_str(&content)
+                .map_err(|e| format!("Failed to parse {}: {}", result.profile.name, e))?;
+
+            // Determine config structure (direct mcpServers vs nested mcp.servers)
+            let uses_nested = result.profile.id == "cursor" ||
+                             result.profile.id == "warp" ||
+                             result.profile.id.starts_with("jetbrains-");
+
+            if uses_nested {
+                // Ensure mcp.servers structure exists
+                if target_config.get("mcp").is_none() {
+                    target_config["mcp"] = serde_json::json!({});
+                }
+                if target_config["mcp"].get("servers").is_none() {
+                    target_config["mcp"]["servers"] = serde_json::json!({});
+                }
+
+                // Replace servers
+                target_config["mcp"]["servers"] = serde_json::json!(source_servers);
+            } else {
+                // Direct mcpServers structure (Claude Desktop, Claude Code, Amazon Q, etc.)
+                if target_config.get("mcpServers").is_none() {
+                    target_config["mcpServers"] = serde_json::json!({});
+                }
+
+                // Replace servers
+                target_config["mcpServers"] = serde_json::json!(source_servers);
+            }
+
+            // Write back to target
+            let updated_content = serde_json::to_string_pretty(&target_config)
+                .map_err(|e| format!("Failed to serialize {}: {}", result.profile.name, e))?;
+
+            tokio::fs::write(config_path, updated_content).await
+                .map_err(|e| format!("Failed to write {}: {}", result.profile.name, e))?;
+
+            synced_apps.push(result.profile.name.clone());
+        }
+    }
+
+    let summary = if synced_apps.is_empty() {
+        "No applications were synced".to_string()
+    } else {
+        format!("Successfully synced {} servers to: {}", source_servers.len(), synced_apps.join(", "))
+    };
+
+    log::info!("{}", summary);
+    Ok(summary)
+}
+
+#[tauri::command]
+async fn save_mcp_control_config(servers: serde_json::Value) -> Result<(), String> {
+    log::info!("Saving MCP Control Lite configuration");
+
+    let config_dir = dirs::config_dir()
+        .ok_or("Could not find config directory")?
+        .join("mcp-control");
+
+    tokio::fs::create_dir_all(&config_dir).await
+        .map_err(|e| format!("Failed to create config directory: {}", e))?;
+
+    let mcp_config_path = config_dir.join("mcp_servers.json");
+
+    let config = serde_json::json!({
+        "mcpServers": servers
+    });
+
+    let content = serde_json::to_string_pretty(&config)
+        .map_err(|e| format!("Failed to serialize config: {}", e))?;
+
+    tokio::fs::write(&mcp_config_path, content).await
+        .map_err(|e| format!("Failed to write config: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_mcp_control_config() -> Result<serde_json::Value, String> {
+    let config_dir = dirs::config_dir()
+        .ok_or("Could not find config directory")?
+        .join("mcp-control");
+    let mcp_config_path = config_dir.join("mcp_servers.json");
+
+    if mcp_config_path.exists() {
+        let content = tokio::fs::read_to_string(&mcp_config_path).await
+            .map_err(|e| format!("Failed to read config: {}", e))?;
+        serde_json::from_str(&content)
+            .map_err(|e| format!("Failed to parse config: {}", e))
+    } else {
+        // Return empty config
+        Ok(serde_json::json!({
+            "mcpServers": {}
+        }))
+    }
+}
+
+#[tauri::command]
 async fn export_logs() -> Result<(), String> {
     Ok(())
 }
@@ -1109,7 +1280,10 @@ Right-click for options")
                 search_mcp_packages,
                 install_mcp_package,
                 delete_server,
-                create_server
+                create_server,
+                sync_from_source,
+                save_mcp_control_config,
+                get_mcp_control_config
             ])
             .run(tauri::generate_context!())
             .expect("error while running tauri application");

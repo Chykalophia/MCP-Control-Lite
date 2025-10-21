@@ -114,11 +114,17 @@ impl ApplicationRegistry {
         
         // Add known MCP-enabled applications
         applications.insert("claude-desktop".to_string(), Self::claude_desktop_profile());
+        applications.insert("claude-code".to_string(), Self::claude_code_profile());
         applications.insert("cursor".to_string(), Self::cursor_profile());
         applications.insert("zed".to_string(), Self::zed_profile());
         applications.insert("vscode".to_string(), Self::vscode_profile());
         applications.insert("continue-dev".to_string(), Self::continue_dev_profile());
         applications.insert("amazon-q".to_string(), Self::amazon_q_profile());
+        applications.insert("warp".to_string(), Self::warp_profile());
+        applications.insert("jetbrains-idea".to_string(), Self::jetbrains_idea_profile());
+        applications.insert("jetbrains-phpstorm".to_string(), Self::jetbrains_phpstorm_profile());
+        applications.insert("jetbrains-webstorm".to_string(), Self::jetbrains_webstorm_profile());
+        applications.insert("jetbrains-pycharm".to_string(), Self::jetbrains_pycharm_profile());
         
         let application_count = applications.len();
         
@@ -369,6 +375,252 @@ impl ApplicationRegistry {
                 category: ApplicationCategory::IDE,
                 mcp_version: "1.0".to_string(),
                 notes: Some("AWS AI coding assistant with MCP support (global settings only)".to_string()),
+                requires_permissions: false,
+            },
+        }
+    }
+
+    /// Get Warp terminal application profile
+    fn warp_profile() -> ApplicationProfile {
+        ApplicationProfile {
+            id: "warp".to_string(),
+            name: "Warp".to_string(),
+            bundle_id: "dev.warp.Warp-Stable".to_string(),
+            config_path: "~/.warp/mcp_config.json".to_string(),
+            alt_config_paths: vec![
+                "~/Library/Application Support/warp/mcp_config.json".to_string(),
+                "~/.config/warp/mcp_config.json".to_string(),
+            ],
+            config_format: ConfigFormat::Json,
+            executable_paths: vec![
+                "/Applications/Warp.app".to_string(),
+            ],
+            alt_executable_paths: vec![
+                "~/Applications/Warp.app".to_string(),
+                "/usr/local/bin/warp".to_string(),
+            ],
+            detection_strategy: DetectionStrategy {
+                use_bundle_lookup: true,
+                use_executable_check: true,
+                use_config_check: true,
+                use_spotlight: true,
+                priority_order: vec![
+                    DetectionMethod::BundleLookup,
+                    DetectionMethod::ExecutableCheck,
+                    DetectionMethod::ConfigCheck,
+                ],
+            },
+            metadata: ApplicationMetadata {
+                version: None,
+                developer: "Warp".to_string(),
+                category: ApplicationCategory::ProductivityTool,
+                mcp_version: "1.0".to_string(),
+                notes: Some("Modern terminal with AI integration and MCP support".to_string()),
+                requires_permissions: false,
+            },
+        }
+    }
+
+    /// Get Claude Code CLI application profile
+    fn claude_code_profile() -> ApplicationProfile {
+        ApplicationProfile {
+            id: "claude-code".to_string(),
+            name: "Claude Code".to_string(),
+            bundle_id: "com.anthropic.claude-code".to_string(),
+            config_path: "~/.claude/config.json".to_string(),
+            alt_config_paths: vec![
+                "~/.config/claude-code/config.json".to_string(),
+                "~/Library/Application Support/Claude Code/config.json".to_string(),
+            ],
+            config_format: ConfigFormat::Json,
+            executable_paths: vec![
+                "/usr/local/bin/claude".to_string(),
+                "/opt/homebrew/bin/claude".to_string(),
+            ],
+            alt_executable_paths: vec![
+                "~/.local/bin/claude".to_string(),
+                "/usr/bin/claude".to_string(),
+            ],
+            detection_strategy: DetectionStrategy {
+                use_bundle_lookup: false,
+                use_executable_check: true,
+                use_config_check: true,
+                use_spotlight: false,
+                priority_order: vec![
+                    DetectionMethod::ConfigCheck,
+                    DetectionMethod::ExecutableCheck,
+                ],
+            },
+            metadata: ApplicationMetadata {
+                version: None,
+                developer: "Anthropic".to_string(),
+                category: ApplicationCategory::CodeEditor,
+                mcp_version: "1.0".to_string(),
+                notes: Some("Claude's official CLI tool with MCP support".to_string()),
+                requires_permissions: false,
+            },
+        }
+    }
+
+    /// Get IntelliJ IDEA application profile
+    fn jetbrains_idea_profile() -> ApplicationProfile {
+        ApplicationProfile {
+            id: "jetbrains-idea".to_string(),
+            name: "IntelliJ IDEA".to_string(),
+            bundle_id: "com.jetbrains.intellij".to_string(),
+            config_path: "~/Library/Application Support/JetBrains/IntelliJIdea/mcp_settings.json".to_string(),
+            alt_config_paths: vec![
+                "~/.config/JetBrains/IntelliJIdea/mcp_settings.json".to_string(),
+                "~/Library/Application Support/JetBrains/IdeaIC/mcp_settings.json".to_string(),
+            ],
+            config_format: ConfigFormat::Json,
+            executable_paths: vec![
+                "/Applications/IntelliJ IDEA.app".to_string(),
+            ],
+            alt_executable_paths: vec![
+                "~/Applications/IntelliJ IDEA.app".to_string(),
+                "/Applications/IntelliJ IDEA CE.app".to_string(),
+                "/usr/local/bin/idea".to_string(),
+            ],
+            detection_strategy: DetectionStrategy {
+                use_bundle_lookup: true,
+                use_executable_check: true,
+                use_config_check: true,
+                use_spotlight: true,
+                priority_order: vec![
+                    DetectionMethod::BundleLookup,
+                    DetectionMethod::ExecutableCheck,
+                    DetectionMethod::ConfigCheck,
+                ],
+            },
+            metadata: ApplicationMetadata {
+                version: None,
+                developer: "JetBrains".to_string(),
+                category: ApplicationCategory::IDE,
+                mcp_version: "1.0".to_string(),
+                notes: Some("Java IDE with MCP plugin support".to_string()),
+                requires_permissions: false,
+            },
+        }
+    }
+
+    /// Get PHPStorm application profile
+    fn jetbrains_phpstorm_profile() -> ApplicationProfile {
+        ApplicationProfile {
+            id: "jetbrains-phpstorm".to_string(),
+            name: "PHPStorm".to_string(),
+            bundle_id: "com.jetbrains.phpstorm".to_string(),
+            config_path: "~/Library/Application Support/JetBrains/PhpStorm/mcp_settings.json".to_string(),
+            alt_config_paths: vec![
+                "~/.config/JetBrains/PhpStorm/mcp_settings.json".to_string(),
+            ],
+            config_format: ConfigFormat::Json,
+            executable_paths: vec![
+                "/Applications/PhpStorm.app".to_string(),
+            ],
+            alt_executable_paths: vec![
+                "~/Applications/PhpStorm.app".to_string(),
+                "/usr/local/bin/phpstorm".to_string(),
+            ],
+            detection_strategy: DetectionStrategy {
+                use_bundle_lookup: true,
+                use_executable_check: true,
+                use_config_check: true,
+                use_spotlight: true,
+                priority_order: vec![
+                    DetectionMethod::BundleLookup,
+                    DetectionMethod::ExecutableCheck,
+                    DetectionMethod::ConfigCheck,
+                ],
+            },
+            metadata: ApplicationMetadata {
+                version: None,
+                developer: "JetBrains".to_string(),
+                category: ApplicationCategory::IDE,
+                mcp_version: "1.0".to_string(),
+                notes: Some("PHP IDE with MCP plugin support".to_string()),
+                requires_permissions: false,
+            },
+        }
+    }
+
+    /// Get WebStorm application profile
+    fn jetbrains_webstorm_profile() -> ApplicationProfile {
+        ApplicationProfile {
+            id: "jetbrains-webstorm".to_string(),
+            name: "WebStorm".to_string(),
+            bundle_id: "com.jetbrains.webstorm".to_string(),
+            config_path: "~/Library/Application Support/JetBrains/WebStorm/mcp_settings.json".to_string(),
+            alt_config_paths: vec![
+                "~/.config/JetBrains/WebStorm/mcp_settings.json".to_string(),
+            ],
+            config_format: ConfigFormat::Json,
+            executable_paths: vec![
+                "/Applications/WebStorm.app".to_string(),
+            ],
+            alt_executable_paths: vec![
+                "~/Applications/WebStorm.app".to_string(),
+                "/usr/local/bin/webstorm".to_string(),
+            ],
+            detection_strategy: DetectionStrategy {
+                use_bundle_lookup: true,
+                use_executable_check: true,
+                use_config_check: true,
+                use_spotlight: true,
+                priority_order: vec![
+                    DetectionMethod::BundleLookup,
+                    DetectionMethod::ExecutableCheck,
+                    DetectionMethod::ConfigCheck,
+                ],
+            },
+            metadata: ApplicationMetadata {
+                version: None,
+                developer: "JetBrains".to_string(),
+                category: ApplicationCategory::IDE,
+                mcp_version: "1.0".to_string(),
+                notes: Some("JavaScript IDE with MCP plugin support".to_string()),
+                requires_permissions: false,
+            },
+        }
+    }
+
+    /// Get PyCharm application profile
+    fn jetbrains_pycharm_profile() -> ApplicationProfile {
+        ApplicationProfile {
+            id: "jetbrains-pycharm".to_string(),
+            name: "PyCharm".to_string(),
+            bundle_id: "com.jetbrains.pycharm".to_string(),
+            config_path: "~/Library/Application Support/JetBrains/PyCharm/mcp_settings.json".to_string(),
+            alt_config_paths: vec![
+                "~/.config/JetBrains/PyCharm/mcp_settings.json".to_string(),
+                "~/Library/Application Support/JetBrains/PyCharmCE/mcp_settings.json".to_string(),
+            ],
+            config_format: ConfigFormat::Json,
+            executable_paths: vec![
+                "/Applications/PyCharm.app".to_string(),
+            ],
+            alt_executable_paths: vec![
+                "~/Applications/PyCharm.app".to_string(),
+                "/Applications/PyCharm CE.app".to_string(),
+                "/usr/local/bin/pycharm".to_string(),
+            ],
+            detection_strategy: DetectionStrategy {
+                use_bundle_lookup: true,
+                use_executable_check: true,
+                use_config_check: true,
+                use_spotlight: true,
+                priority_order: vec![
+                    DetectionMethod::BundleLookup,
+                    DetectionMethod::ExecutableCheck,
+                    DetectionMethod::ConfigCheck,
+                ],
+            },
+            metadata: ApplicationMetadata {
+                version: None,
+                developer: "JetBrains".to_string(),
+                category: ApplicationCategory::IDE,
+                mcp_version: "1.0".to_string(),
+                notes: Some("Python IDE with MCP plugin support".to_string()),
                 requires_permissions: false,
             },
         }

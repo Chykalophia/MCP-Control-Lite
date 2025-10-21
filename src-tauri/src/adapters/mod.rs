@@ -8,6 +8,9 @@ pub mod claude_desktop;
 pub mod cursor;
 pub mod amazon_q;
 pub mod generic;
+pub mod warp;
+pub mod claude_code;
+pub mod jetbrains;
 
 /// Result of configuration extraction
 #[derive(Debug, Clone)]
@@ -61,15 +64,29 @@ impl AdapterFactory {
     pub fn create_adapter(profile: &ApplicationProfile) -> Result<Box<dyn ApplicationAdapter>> {
         match profile.id.as_str() {
             "claude-desktop" => Ok(Box::new(claude_desktop::ClaudeDesktopAdapter::new())),
+            "claude-code" => Ok(Box::new(claude_code::ClaudeCodeAdapter::new())),
             "cursor" => Ok(Box::new(cursor::CursorAdapter::new())),
             "amazon-q" => Ok(Box::new(amazon_q::AmazonQAdapter::new())),
+            "warp" => Ok(Box::new(warp::WarpAdapter::new())),
+            id if id.starts_with("jetbrains-") => Ok(Box::new(jetbrains::JetBrainsAdapter::new())),
             _ => Ok(Box::new(generic::GenericAdapter::new())),
         }
     }
     
     /// Get all available adapter types
     pub fn get_available_adapters() -> Vec<&'static str> {
-        vec!["claude-desktop", "cursor", "amazon-q", "generic"]
+        vec![
+            "claude-desktop",
+            "claude-code",
+            "cursor",
+            "amazon-q",
+            "warp",
+            "jetbrains-idea",
+            "jetbrains-phpstorm",
+            "jetbrains-webstorm",
+            "jetbrains-pycharm",
+            "generic"
+        ]
     }
 }
 
