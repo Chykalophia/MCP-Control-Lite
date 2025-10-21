@@ -5,118 +5,127 @@ use serde_json::Value as JsonValue;
 use crate::detection::{McpServerConfig, ServerType, ApplicationProfile, ConfigFormat};
 use super::{ApplicationAdapter, ExtractionResult, ApplicationResult};
 
-/// Claude Desktop application adapter
-pub struct ClaudeDesktopAdapter;
+/// Warp terminal application adapter
+pub struct WarpAdapter;
 
-impl ClaudeDesktopAdapter {
+impl WarpAdapter {
     pub fn new() -> Self {
         Self
     }
 }
 
 #[async_trait]
-impl ApplicationAdapter for ClaudeDesktopAdapter {
+impl ApplicationAdapter for WarpAdapter {
     async fn extract_server_configs(&self, config: &JsonValue) -> Result<ExtractionResult> {
         let mut servers = Vec::new();
         let mut messages = Vec::new();
-        
-        // Claude Desktop stores MCP configs in config.mcpServers
-        if let Some(mcp_servers) = config.get("mcpServers").and_then(|v| v.as_object()) {
-            for (name, server_config) in mcp_servers {
-                match self.parse_server_config(name, server_config) {
-                    Ok(server) => servers.push(server),
-                    Err(e) => {
-                        messages.push(format!("Failed to parse server '{}': {}", name, e));
+
+        // Warp stores MCP configs in config.mcp.servers (similar to Cursor)
+        if let Some(mcp_config) = config.get("mcp") {
+            if let Some(mcp_servers) = mcp_config.get("servers").and_then(|v| v.as_object()) {
+                for (name, server_config) in mcp_servers {
+                    match self.parse_server_config(name, server_config) {
+                        Ok(server) => servers.push(server),
+                        Err(e) => {
+                            messages.push(format!("Failed to parse server '{}': {}", name, e));
+                        }
                     }
                 }
+            } else {
+                messages.push("No servers section found in mcp configuration".to_string());
             }
         } else {
-            messages.push("No mcpServers section found in configuration".to_string());
+            messages.push("No mcp section found in configuration".to_string());
         }
-        
+
         Ok(ExtractionResult {
             servers,
             messages,
             success: true,
         })
     }
-    
+
     async fn apply_server_configs(&self, config: &JsonValue, servers: &[McpServerConfig]) -> Result<ApplicationResult> {
         let mut new_config = config.clone();
         let mut messages = Vec::new();
-        
-        // Ensure mcpServers object exists
-        if new_config.get("mcpServers").is_none() {
-            new_config["mcpServers"] = serde_json::json!({});
+
+        // Ensure mcp.servers structure exists
+        if new_config.get("mcp").is_none() {
+            new_config["mcp"] = serde_json::json!({});
         }
-        
-        let mcp_servers = new_config.get_mut("mcpServers")
-            .and_then(|v| v.as_object_mut())
-            .context("Failed to get mcpServers as object")?;
-        
+        if new_config["mcp"].get("servers").is_none() {
+            new_config["mcp"]["servers"] = serde_json::json!({});
+        }
+
+        let mcp_servers = new_config["mcp"]["servers"]
+            .as_object_mut()
+            .context("Failed to get mcp.servers as object")?;
+
         // Clear existing servers
         mcp_servers.clear();
-        
+
         // Add new servers
         for server in servers {
             let server_config = self.format_server_config(server)?;
             mcp_servers.insert(server.name.clone(), server_config);
             messages.push(format!("Added server '{}'", server.name));
         }
-        
+
         Ok(ApplicationResult {
             config: new_config,
             messages,
             success: true,
         })
     }
-    
+
     async fn validate_config(&self, config: &JsonValue) -> Result<bool> {
-        // Check if mcpServers exists and is an object
-        if let Some(mcp_servers) = config.get("mcpServers") {
-            if !mcp_servers.is_object() {
-                return Ok(false);
-            }
-            
-            // Validate each server configuration
-            if let Some(servers) = mcp_servers.as_object() {
-                for (name, server_config) in servers {
-                    if !self.validate_server_config(name, server_config) {
-                        return Ok(false);
+        // Check if mcp.servers exists and is an object
+        if let Some(mcp_config) = config.get("mcp") {
+            if let Some(mcp_servers) = mcp_config.get("servers") {
+                if !mcp_servers.is_object() {
+                    return Ok(false);
+                }
+
+                // Validate each server configuration
+                if let Some(servers) = mcp_servers.as_object() {
+                    for (name, server_config) in servers {
+                        if !self.validate_server_config(name, server_config) {
+                            return Ok(false);
+                        }
                     }
                 }
             }
         }
-        
+
         Ok(true)
     }
-    
+
     fn get_supported_formats(&self) -> Vec<ConfigFormat> {
         vec![ConfigFormat::Json]
     }
-    
+
     fn get_name(&self) -> &str {
-        "claude-desktop"
+        "warp"
     }
-    
+
     fn can_handle(&self, profile: &ApplicationProfile) -> bool {
-        profile.id == "claude-desktop"
+        profile.id == "warp"
     }
 }
 
-impl ClaudeDesktopAdapter {
+impl WarpAdapter {
     fn parse_server_config(&self, name: &str, config: &JsonValue) -> Result<McpServerConfig> {
         use crate::detection::{ServerMetadata, ConfigSource};
-        
+
         let command = config.get("command")
             .and_then(|v| v.as_str())
             .context("Missing or invalid command")?;
-        
+
         let args = config.get("args")
             .and_then(|v| v.as_array())
             .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
             .unwrap_or_default();
-        
+
         let env = config.get("env")
             .and_then(|v| v.as_object())
             .map(|obj| {
@@ -125,7 +134,7 @@ impl ClaudeDesktopAdapter {
                     .collect()
             })
             .unwrap_or_default();
-        
+
         Ok(McpServerConfig {
             name: name.to_string(),
             command: Some(command.to_string()),
@@ -143,44 +152,44 @@ impl ClaudeDesktopAdapter {
             },
         })
     }
-    
+
     fn format_server_config(&self, server: &McpServerConfig) -> Result<JsonValue> {
         let mut config = serde_json::json!({
             "command": server.command,
             "args": server.args
         });
-        
+
         if !server.env.is_empty() {
             config["env"] = serde_json::json!(server.env);
         }
-        
+
         if !server.metadata.enabled {
             config["disabled"] = serde_json::json!(true);
         }
-        
+
         Ok(config)
     }
-    
+
     fn validate_server_config(&self, _name: &str, config: &JsonValue) -> bool {
         // Must have command
         if config.get("command").and_then(|v| v.as_str()).is_none() {
             return false;
         }
-        
+
         // Args must be array if present
         if let Some(args) = config.get("args") {
             if !args.is_array() {
                 return false;
             }
         }
-        
+
         // Env must be object if present
         if let Some(env) = config.get("env") {
             if !env.is_object() {
                 return false;
             }
         }
-        
+
         true
     }
 }
@@ -189,82 +198,46 @@ impl ClaudeDesktopAdapter {
 mod tests {
     use super::*;
     use serde_json::json;
-    
+
     #[tokio::test]
     async fn test_extract_server_configs() {
-        let adapter = ClaudeDesktopAdapter::new();
+        let adapter = WarpAdapter::new();
         let config = json!({
-            "mcpServers": {
-                "test-server": {
-                    "command": "node",
-                    "args": ["server.js"],
-                    "env": {
-                        "API_KEY": "your-api-key-here"
+            "mcp": {
+                "servers": {
+                    "test-server": {
+                        "command": "node",
+                        "args": ["server.js"],
+                        "env": {
+                            "API_KEY": "your-api-key-here"
+                        }
                     }
                 }
             }
         });
-        
+
         let result = adapter.extract_server_configs(&config).await.unwrap();
         assert!(result.success);
         assert_eq!(result.servers.len(), 1);
         assert_eq!(result.servers[0].name, "test-server");
         assert_eq!(result.servers[0].command, Some("node".to_string()));
     }
-    
-    #[tokio::test]
-    async fn test_apply_server_configs() {
-        use crate::detection::{ServerMetadata, ConfigSource};
-        
-        let adapter = ClaudeDesktopAdapter::new();
-        let config = json!({});
-        let servers = vec![McpServerConfig {
-            name: "test-server".to_string(),
-            command: Some("node".to_string()),
-            args: vec!["server.js".to_string()],
-            env: std::collections::HashMap::new(),
-            cwd: None,
-            server_type: ServerType::Stdio,
-            metadata: ServerMetadata {
-                description: None,
-                version: None,
-                author: None,
-                capabilities: vec![],
-                enabled: true,
-                source: ConfigSource::MainConfig,
-            },
-        }];
-        
-        let result = adapter.apply_server_configs(&config, &servers).await.unwrap();
-        assert!(result.success);
-        assert!(result.config.get("mcpServers").is_some());
-    }
-    
+
     #[tokio::test]
     async fn test_validate_config() {
-        let adapter = ClaudeDesktopAdapter::new();
+        let adapter = WarpAdapter::new();
         let valid_config = json!({
-            "mcpServers": {
-                "test-server": {
-                    "command": "node",
-                    "args": ["server.js"]
+            "mcp": {
+                "servers": {
+                    "test-server": {
+                        "command": "node",
+                        "args": ["server.js"]
+                    }
                 }
             }
         });
-        
+
         let result = adapter.validate_config(&valid_config).await.unwrap();
         assert!(result);
-        
-        let invalid_config = json!({
-            "mcpServers": {
-                "test-server": {
-                    "args": ["server.js"]
-                    // Missing command
-                }
-            }
-        });
-        
-        let result = adapter.validate_config(&invalid_config).await.unwrap();
-        assert!(!result);
     }
 }

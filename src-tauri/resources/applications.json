@@ -1,0 +1,442 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "version": "1.0.0",
+  "description": "MCP Control Lite - Application Registry Configuration",
+  "applications": [
+    {
+      "id": "claude-desktop",
+      "name": "Claude Desktop",
+      "bundle_id": "com.anthropic.claudedesktop",
+      "config_path": "~/Library/Application Support/Claude/claude_desktop_config.json",
+      "alt_config_paths": [],
+      "config_format": "Json",
+      "config_structure": "DirectMcpServers",
+      "executable_paths": [
+        "/Applications/Claude.app"
+      ],
+      "alt_executable_paths": [],
+      "detection_strategy": {
+        "use_bundle_lookup": true,
+        "use_executable_check": true,
+        "use_config_check": true,
+        "use_spotlight": true,
+        "priority_order": ["BundleLookup", "ConfigCheck", "ExecutableCheck"]
+      },
+      "metadata": {
+        "version": null,
+        "developer": "Anthropic",
+        "category": "AIAssistant",
+        "release_year": 2024,
+        "official_docs_url": "https://docs.anthropic.com/claude/docs",
+        "config_docs_url": "https://docs.anthropic.com/claude/docs/model-context-protocol",
+        "support_url": "https://support.anthropic.com",
+        "license": "Proprietary",
+        "platforms": ["macOS", "Windows", "Linux"],
+        "min_version": null,
+        "notes": "Primary AI assistant with comprehensive MCP support"
+      }
+    },
+    {
+      "id": "claude-code",
+      "name": "Claude Code",
+      "bundle_id": "com.anthropic.claudecode",
+      "config_path": "~/.config/claude/config.json",
+      "alt_config_paths": [
+        "~/.claude/config.json"
+      ],
+      "config_format": "Json",
+      "config_structure": "DirectMcpServers",
+      "executable_paths": [
+        "~/.local/bin/claude",
+        "/usr/local/bin/claude"
+      ],
+      "alt_executable_paths": [
+        "~/bin/claude"
+      ],
+      "detection_strategy": {
+        "use_bundle_lookup": false,
+        "use_executable_check": true,
+        "use_config_check": true,
+        "use_spotlight": false,
+        "priority_order": ["ConfigCheck", "ExecutableCheck"]
+      },
+      "metadata": {
+        "version": null,
+        "developer": "Anthropic",
+        "category": "DeveloperTool",
+        "release_year": 2024,
+        "official_docs_url": "https://docs.claude.com/claude-code",
+        "config_docs_url": "https://docs.claude.com/claude-code/mcp",
+        "support_url": "https://support.anthropic.com",
+        "license": "Proprietary",
+        "platforms": ["macOS", "Linux"],
+        "min_version": null,
+        "notes": "CLI tool for AI-powered coding assistance"
+      }
+    },
+    {
+      "id": "cursor",
+      "name": "Cursor",
+      "bundle_id": "com.todesktop.230313mzl4w4u92",
+      "config_path": "~/Library/Application Support/Cursor/User/globalStorage/settings.json",
+      "alt_config_paths": [],
+      "config_format": "Json",
+      "config_structure": "NestedMcpServers",
+      "executable_paths": [
+        "/Applications/Cursor.app"
+      ],
+      "alt_executable_paths": [
+        "~/Applications/Cursor.app"
+      ],
+      "detection_strategy": {
+        "use_bundle_lookup": true,
+        "use_executable_check": true,
+        "use_config_check": true,
+        "use_spotlight": true,
+        "priority_order": ["BundleLookup", "ConfigCheck", "ExecutableCheck"]
+      },
+      "metadata": {
+        "version": null,
+        "developer": "Anysphere",
+        "category": "IDE",
+        "release_year": 2023,
+        "official_docs_url": "https://cursor.sh/docs",
+        "config_docs_url": "https://cursor.sh/docs/mcp",
+        "support_url": "https://cursor.sh/support",
+        "license": "Proprietary",
+        "platforms": ["macOS", "Windows", "Linux"],
+        "min_version": null,
+        "notes": "AI-first code editor with MCP support"
+      }
+    },
+    {
+      "id": "warp",
+      "name": "Warp",
+      "bundle_id": "dev.warp.Warp-Stable",
+      "config_path": "~/.warp/config.json",
+      "alt_config_paths": [
+        "~/Library/Application Support/dev.warp.Warp-Stable/config.json"
+      ],
+      "config_format": "Json",
+      "config_structure": "NestedMcpServers",
+      "executable_paths": [
+        "/Applications/Warp.app"
+      ],
+      "alt_executable_paths": [
+        "~/Applications/Warp.app"
+      ],
+      "detection_strategy": {
+        "use_bundle_lookup": true,
+        "use_executable_check": true,
+        "use_config_check": true,
+        "use_spotlight": true,
+        "priority_order": ["BundleLookup", "ConfigCheck", "ExecutableCheck"]
+      },
+      "metadata": {
+        "version": null,
+        "developer": "Warp",
+        "category": "Terminal",
+        "release_year": 2022,
+        "official_docs_url": "https://docs.warp.dev",
+        "config_docs_url": "https://docs.warp.dev/features/mcp",
+        "support_url": "https://warp.dev/support",
+        "license": "Proprietary",
+        "platforms": ["macOS", "Linux"],
+        "min_version": null,
+        "notes": "Modern terminal with AI integration"
+      }
+    },
+    {
+      "id": "zed",
+      "name": "Zed",
+      "bundle_id": "dev.zed.Zed",
+      "config_path": "~/.config/zed/settings.json",
+      "alt_config_paths": [
+        "~/Library/Application Support/Zed/settings.json"
+      ],
+      "config_format": "Json",
+      "config_structure": "DirectMcpServers",
+      "executable_paths": [
+        "/Applications/Zed.app",
+        "/usr/local/bin/zed"
+      ],
+      "alt_executable_paths": [
+        "~/Applications/Zed.app"
+      ],
+      "detection_strategy": {
+        "use_bundle_lookup": true,
+        "use_executable_check": true,
+        "use_config_check": true,
+        "use_spotlight": true,
+        "priority_order": ["BundleLookup", "ConfigCheck", "ExecutableCheck"]
+      },
+      "metadata": {
+        "version": null,
+        "developer": "Zed Industries",
+        "category": "IDE",
+        "release_year": 2024,
+        "official_docs_url": "https://zed.dev/docs",
+        "config_docs_url": "https://zed.dev/docs/mcp",
+        "support_url": "https://zed.dev/support",
+        "license": "Open Source",
+        "platforms": ["macOS", "Linux"],
+        "min_version": null,
+        "notes": "High-performance collaborative code editor"
+      }
+    },
+    {
+      "id": "vscode",
+      "name": "Visual Studio Code",
+      "bundle_id": "com.microsoft.VSCode",
+      "config_path": "~/Library/Application Support/Code/User/settings.json",
+      "alt_config_paths": [
+        "~/.config/Code/User/settings.json"
+      ],
+      "config_format": "Json",
+      "config_structure": "DirectMcpServers",
+      "executable_paths": [
+        "/Applications/Visual Studio Code.app",
+        "/usr/local/bin/code"
+      ],
+      "alt_executable_paths": [
+        "~/Applications/Visual Studio Code.app"
+      ],
+      "detection_strategy": {
+        "use_bundle_lookup": true,
+        "use_executable_check": true,
+        "use_config_check": true,
+        "use_spotlight": true,
+        "priority_order": ["BundleLookup", "ConfigCheck", "ExecutableCheck"]
+      },
+      "metadata": {
+        "version": null,
+        "developer": "Microsoft",
+        "category": "IDE",
+        "release_year": 2015,
+        "official_docs_url": "https://code.visualstudio.com/docs",
+        "config_docs_url": "https://code.visualstudio.com/docs/mcp",
+        "support_url": "https://code.visualstudio.com/support",
+        "license": "MIT",
+        "platforms": ["macOS", "Windows", "Linux"],
+        "min_version": null,
+        "notes": "Popular extensible code editor"
+      }
+    },
+    {
+      "id": "continue-dev",
+      "name": "Continue.dev",
+      "bundle_id": "dev.continue",
+      "config_path": "~/.continue/config.json",
+      "alt_config_paths": [
+        "~/Library/Application Support/continue/config.json"
+      ],
+      "config_format": "Json",
+      "config_structure": "DirectMcpServers",
+      "executable_paths": [],
+      "alt_executable_paths": [],
+      "detection_strategy": {
+        "use_bundle_lookup": false,
+        "use_executable_check": false,
+        "use_config_check": true,
+        "use_spotlight": false,
+        "priority_order": ["ConfigCheck"]
+      },
+      "metadata": {
+        "version": null,
+        "developer": "Continue",
+        "category": "AIAssistant",
+        "release_year": 2023,
+        "official_docs_url": "https://continue.dev/docs",
+        "config_docs_url": "https://continue.dev/docs/mcp",
+        "support_url": "https://continue.dev/support",
+        "license": "Apache-2.0",
+        "platforms": ["macOS", "Windows", "Linux"],
+        "min_version": null,
+        "notes": "Open-source AI code assistant"
+      }
+    },
+    {
+      "id": "amazon-q",
+      "name": "Amazon Q Developer",
+      "bundle_id": "com.amazon.q",
+      "config_path": "~/Library/Application Support/Amazon Q/config.json",
+      "alt_config_paths": [
+        "~/.aws/amazonq/config.json"
+      ],
+      "config_format": "Json",
+      "config_structure": "DirectMcpServers",
+      "executable_paths": [
+        "/Applications/Amazon Q.app"
+      ],
+      "alt_executable_paths": [],
+      "detection_strategy": {
+        "use_bundle_lookup": true,
+        "use_executable_check": true,
+        "use_config_check": true,
+        "use_spotlight": true,
+        "priority_order": ["BundleLookup", "ConfigCheck", "ExecutableCheck"]
+      },
+      "metadata": {
+        "version": null,
+        "developer": "Amazon",
+        "category": "AIAssistant",
+        "release_year": 2023,
+        "official_docs_url": "https://aws.amazon.com/q/developer/",
+        "config_docs_url": "https://docs.aws.amazon.com/amazonq/",
+        "support_url": "https://aws.amazon.com/support/",
+        "license": "Proprietary",
+        "platforms": ["macOS", "Windows", "Linux"],
+        "min_version": null,
+        "notes": "AWS's AI-powered developer assistant"
+      }
+    },
+    {
+      "id": "jetbrains-idea",
+      "name": "IntelliJ IDEA",
+      "bundle_id": "com.jetbrains.intellij",
+      "config_path": "~/Library/Application Support/JetBrains/IntelliJIdea/mcp_settings.json",
+      "alt_config_paths": [
+        "~/.config/JetBrains/IntelliJIdea/mcp_settings.json"
+      ],
+      "config_format": "Json",
+      "config_structure": "NestedMcpServers",
+      "executable_paths": [
+        "/Applications/IntelliJ IDEA.app"
+      ],
+      "alt_executable_paths": [
+        "~/Applications/IntelliJ IDEA.app"
+      ],
+      "detection_strategy": {
+        "use_bundle_lookup": true,
+        "use_executable_check": true,
+        "use_config_check": true,
+        "use_spotlight": true,
+        "priority_order": ["BundleLookup", "ConfigCheck", "ExecutableCheck"]
+      },
+      "metadata": {
+        "version": null,
+        "developer": "JetBrains",
+        "category": "IDE",
+        "release_year": 2001,
+        "official_docs_url": "https://www.jetbrains.com/idea/documentation/",
+        "config_docs_url": "https://www.jetbrains.com/help/idea/mcp-integration.html",
+        "support_url": "https://www.jetbrains.com/support/idea/",
+        "license": "Proprietary",
+        "platforms": ["macOS", "Windows", "Linux"],
+        "min_version": null,
+        "notes": "Professional Java IDE with MCP support"
+      }
+    },
+    {
+      "id": "jetbrains-phpstorm",
+      "name": "PHPStorm",
+      "bundle_id": "com.jetbrains.PhpStorm",
+      "config_path": "~/Library/Application Support/JetBrains/PhpStorm/mcp_settings.json",
+      "alt_config_paths": [
+        "~/.config/JetBrains/PhpStorm/mcp_settings.json"
+      ],
+      "config_format": "Json",
+      "config_structure": "NestedMcpServers",
+      "executable_paths": [
+        "/Applications/PhpStorm.app"
+      ],
+      "alt_executable_paths": [
+        "~/Applications/PhpStorm.app"
+      ],
+      "detection_strategy": {
+        "use_bundle_lookup": true,
+        "use_executable_check": true,
+        "use_config_check": true,
+        "use_spotlight": true,
+        "priority_order": ["BundleLookup", "ConfigCheck", "ExecutableCheck"]
+      },
+      "metadata": {
+        "version": null,
+        "developer": "JetBrains",
+        "category": "IDE",
+        "release_year": 2009,
+        "official_docs_url": "https://www.jetbrains.com/phpstorm/documentation/",
+        "config_docs_url": "https://www.jetbrains.com/help/phpstorm/mcp-integration.html",
+        "support_url": "https://www.jetbrains.com/support/phpstorm/",
+        "license": "Proprietary",
+        "platforms": ["macOS", "Windows", "Linux"],
+        "min_version": null,
+        "notes": "Professional PHP IDE with MCP support"
+      }
+    },
+    {
+      "id": "jetbrains-webstorm",
+      "name": "WebStorm",
+      "bundle_id": "com.jetbrains.WebStorm",
+      "config_path": "~/Library/Application Support/JetBrains/WebStorm/mcp_settings.json",
+      "alt_config_paths": [
+        "~/.config/JetBrains/WebStorm/mcp_settings.json"
+      ],
+      "config_format": "Json",
+      "config_structure": "NestedMcpServers",
+      "executable_paths": [
+        "/Applications/WebStorm.app"
+      ],
+      "alt_executable_paths": [
+        "~/Applications/WebStorm.app"
+      ],
+      "detection_strategy": {
+        "use_bundle_lookup": true,
+        "use_executable_check": true,
+        "use_config_check": true,
+        "use_spotlight": true,
+        "priority_order": ["BundleLookup", "ConfigCheck", "ExecutableCheck"]
+      },
+      "metadata": {
+        "version": null,
+        "developer": "JetBrains",
+        "category": "IDE",
+        "release_year": 2010,
+        "official_docs_url": "https://www.jetbrains.com/webstorm/documentation/",
+        "config_docs_url": "https://www.jetbrains.com/help/webstorm/mcp-integration.html",
+        "support_url": "https://www.jetbrains.com/support/webstorm/",
+        "license": "Proprietary",
+        "platforms": ["macOS", "Windows", "Linux"],
+        "min_version": null,
+        "notes": "Professional JavaScript IDE with MCP support"
+      }
+    },
+    {
+      "id": "jetbrains-pycharm",
+      "name": "PyCharm",
+      "bundle_id": "com.jetbrains.pycharm",
+      "config_path": "~/Library/Application Support/JetBrains/PyCharm/mcp_settings.json",
+      "alt_config_paths": [
+        "~/.config/JetBrains/PyCharm/mcp_settings.json"
+      ],
+      "config_format": "Json",
+      "config_structure": "NestedMcpServers",
+      "executable_paths": [
+        "/Applications/PyCharm.app"
+      ],
+      "alt_executable_paths": [
+        "~/Applications/PyCharm.app"
+      ],
+      "detection_strategy": {
+        "use_bundle_lookup": true,
+        "use_executable_check": true,
+        "use_config_check": true,
+        "use_spotlight": true,
+        "priority_order": ["BundleLookup", "ConfigCheck", "ExecutableCheck"]
+      },
+      "metadata": {
+        "version": null,
+        "developer": "JetBrains",
+        "category": "IDE",
+        "release_year": 2010,
+        "official_docs_url": "https://www.jetbrains.com/pycharm/documentation/",
+        "config_docs_url": "https://www.jetbrains.com/help/pycharm/mcp-integration.html",
+        "support_url": "https://www.jetbrains.com/support/pycharm/",
+        "license": "Proprietary",
+        "platforms": ["macOS", "Windows", "Linux"],
+        "min_version": null,
+        "notes": "Professional Python IDE with MCP support"
+      }
+    }
+  ]
+}

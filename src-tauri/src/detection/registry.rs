@@ -106,7 +106,7 @@ impl ManualRegistryManager {
     /// Create a new manual registry manager
     pub fn new() -> Self {
         Self {
-            base_registry: ApplicationRegistry::new(),
+            base_registry: ApplicationRegistry::with_auto_load(),
             custom_applications: HashMap::new(),
             registry_file_path: None,
         }

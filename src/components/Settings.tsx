@@ -13,13 +13,21 @@ interface UserSettings {
   logLevel: 'error' | 'warn' | 'info' | 'debug';
   enableLogs: boolean;
   developerMode: boolean;
+  sourceOfTruth: string;
+  autoSync: boolean;
   enabledApps: {
     'Claude Desktop': boolean;
     'Cursor': boolean;
     'Amazon Q Developer': boolean;
     'Visual Studio Code': boolean;
+    'Warp': boolean;
+    'Claude Code': boolean;
     'Zed': boolean;
     'Continue.dev': boolean;
+    'IntelliJ IDEA': boolean;
+    'PHPStorm': boolean;
+    'WebStorm': boolean;
+    'PyCharm': boolean;
   };
 }
 
@@ -34,13 +42,21 @@ const defaultSettings: UserSettings = {
   logLevel: 'info',
   enableLogs: true,
   developerMode: false,
+  sourceOfTruth: 'none',
+  autoSync: false,
   enabledApps: {
     'Claude Desktop': true,
     'Cursor': true,
     'Amazon Q Developer': true,
     'Visual Studio Code': true,
+    'Warp': true,
+    'Claude Code': true,
     'Zed': false,
     'Continue.dev': false,
+    'IntelliJ IDEA': false,
+    'PHPStorm': false,
+    'WebStorm': false,
+    'PyCharm': false,
   },
 };
 
@@ -53,9 +69,12 @@ export default function Settings({ onSettingsSaved }: SettingsProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [availableApps, setAvailableApps] = useState<string[]>([]);
 
   useEffect(() => {
     loadSettings();
+    loadAvailableApplications();
   }, []);
 
   const loadSettings = async () => {
@@ -67,6 +86,22 @@ export default function Settings({ onSettingsSaved }: SettingsProps) {
       setSettings(defaultSettings);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAvailableApplications = async () => {
+    try {
+      const apps = await invoke<Array<{name: string}>>('get_applications');
+      const appNames = apps.map(app => app.name);
+      setAvailableApps(appNames);
+    } catch (error) {
+      console.error('Failed to load available applications:', error);
+      // Fallback to hardcoded list if loading fails
+      setAvailableApps([
+        'Claude Desktop', 'Claude Code', 'Cursor', 'Warp',
+        'Visual Studio Code', 'Amazon Q Developer', 'IntelliJ IDEA',
+        'PHPStorm', 'WebStorm', 'PyCharm', 'Zed', 'Continue.dev'
+      ]);
     }
   };
 
@@ -152,6 +187,34 @@ export default function Settings({ onSettingsSaved }: SettingsProps) {
     } catch (error) {
       console.error('Failed to import config:', error);
       setMessage('Failed to import configuration');
+    }
+  };
+
+  const handleSync = async () => {
+    if (settings.sourceOfTruth === 'none') {
+      setMessage('Please select a source of truth first');
+      setTimeout(() => setMessage(null), 3000);
+      return;
+    }
+
+    setSyncing(true);
+    setMessage(null);
+    try {
+      const result = await invoke<string>('sync_from_source', {
+        sourceApp: settings.sourceOfTruth
+      });
+      setMessage(result);
+      setTimeout(() => setMessage(null), 5000);
+
+      // Refresh data if callback provided
+      if (onSettingsSaved) {
+        onSettingsSaved();
+      }
+    } catch (error) {
+      console.error('Failed to sync:', error);
+      setMessage(`Failed to sync: ${error}`);
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -283,6 +346,70 @@ export default function Settings({ onSettingsSaved }: SettingsProps) {
                 }}
               />
             </label>
+          </div>
+        </div>
+
+        {/* Source of Truth Configuration */}
+        <div style={{ background: 'var(--bg-secondary)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+          <h3 style={{ marginBottom: '16px', color: 'var(--text-primary)' }}>Source of Truth Configuration</h3>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '16px', fontSize: '14px' }}>
+            Select which application should be the authoritative source for MCP server configurations.
+            When syncing, all other applications will be updated to match the source.
+          </p>
+
+          <div style={{ display: 'grid', gap: '12px' }}>
+            <label style={{ color: 'var(--text-primary)' }}>
+              Source of Truth:
+              <select
+                value={settings.sourceOfTruth}
+                onChange={(e) => setSettings({ ...settings, sourceOfTruth: e.target.value })}
+                style={{
+                  marginLeft: '8px',
+                  padding: '6px 12px',
+                  background: 'var(--bg-primary)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '4px',
+                  minWidth: '200px'
+                }}
+              >
+                <option value="none">None (Manual Sync Only)</option>
+                <option value="MCP Control Lite">MCP Control Lite</option>
+                {availableApps.map(app => (
+                  <option key={app} value={app}>{app}</option>
+                ))}
+              </select>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
+              <input
+                type="checkbox"
+                checked={false}
+                disabled={true}
+                style={{ opacity: 0.5 }}
+              />
+              <span style={{ textDecoration: 'line-through' }}>Auto-sync when source changes</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                (Coming Soon)
+              </span>
+            </label>
+
+            <div style={{ marginTop: '10px' }}>
+              <button
+                className="btn btn-primary"
+                onClick={handleSync}
+                disabled={syncing || settings.sourceOfTruth === 'none'}
+                style={{ opacity: settings.sourceOfTruth === 'none' ? 0.5 : 1 }}
+              >
+                <RefreshCw size={16} style={{ marginRight: '8px' }} />
+                {syncing ? 'Syncing...' : 'Sync Now'}
+              </button>
+              {settings.sourceOfTruth !== 'none' && (
+                <p style={{ color: 'var(--text-secondary)', marginTop: '8px', fontSize: '13px' }}>
+                  This will copy all MCP servers from "{settings.sourceOfTruth}" to all other detected applications.
+                </p>
+              )}
+            </div>
           </div>
         </div>
 

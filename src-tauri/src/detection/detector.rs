@@ -76,7 +76,7 @@ impl ApplicationDetector {
     /// Create a new application detector
     pub fn new() -> Result<Self> {
         Ok(Self {
-            registry: ApplicationRegistry::new(),
+            registry: ApplicationRegistry::with_auto_load(),
             detection_cache: HashMap::new(),
         })
     }
