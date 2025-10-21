@@ -1,6 +1,17 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Configuration structure type for MCP servers
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum ConfigStructure {
+    /// Direct mcpServers object (e.g., Claude Desktop, Amazon Q)
+    DirectMcpServers,
+    /// Nested mcp.servers object (e.g., Cursor, Warp)
+    NestedMcpServers,
+    /// Custom structure (requires special handling)
+    Custom(String),
+}
+
 /// Represents a known MCP-enabled application with detection patterns
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ApplicationProfile {
@@ -16,6 +27,8 @@ pub struct ApplicationProfile {
     pub alt_config_paths: Vec<String>,
     /// Expected configuration file format
     pub config_format: ConfigFormat,
+    /// Configuration structure type
+    pub config_structure: ConfigStructure,
     /// Standard installation paths to check
     pub executable_paths: Vec<String>,
     /// Alternative installation paths
@@ -24,6 +37,79 @@ pub struct ApplicationProfile {
     pub detection_strategy: DetectionStrategy,
     /// Application-specific metadata
     pub metadata: ApplicationMetadata,
+}
+
+impl ApplicationProfile {
+    /// Check if this application uses nested mcp.servers structure
+    pub fn uses_nested_config(&self) -> bool {
+        matches!(self.config_structure, ConfigStructure::NestedMcpServers)
+    }
+
+    /// Get the JSON path to MCP servers configuration
+    pub fn get_mcp_servers_path(&self) -> Vec<&str> {
+        match &self.config_structure {
+            ConfigStructure::DirectMcpServers => vec!["mcpServers"],
+            ConfigStructure::NestedMcpServers => vec!["mcp", "servers"],
+            ConfigStructure::Custom(_) => vec!["mcpServers"], // Default fallback
+        }
+    }
+
+    /// Validate that a config file matches the declared structure
+    ///
+    /// Returns a result with validation details:
+    /// - Ok(()) if structure matches
+    /// - Err(message) with description if mismatch detected
+    pub fn validate_config_structure(&self, config: &serde_json::Value) -> Result<(), String> {
+        match &self.config_structure {
+            ConfigStructure::DirectMcpServers => {
+                // Should have mcpServers at root level
+                let has_direct = config.get("mcpServers").is_some();
+                let has_nested = config.get("mcp")
+                    .and_then(|m| m.get("servers"))
+                    .is_some();
+
+                if !has_direct && has_nested {
+                    return Err(format!(
+                        "Application '{}' is configured as DirectMcpServers but config uses nested mcp.servers structure",
+                        self.name
+                    ));
+                }
+
+                if !has_direct && !has_nested {
+                    // Neither structure found - might be empty config
+                    log::debug!("No MCP servers configuration found in {} config", self.name);
+                }
+
+                Ok(())
+            }
+            ConfigStructure::NestedMcpServers => {
+                // Should have mcp.servers nested structure
+                let has_nested = config.get("mcp")
+                    .and_then(|m| m.get("servers"))
+                    .is_some();
+                let has_direct = config.get("mcpServers").is_some();
+
+                if !has_nested && has_direct {
+                    return Err(format!(
+                        "Application '{}' is configured as NestedMcpServers but config uses direct mcpServers structure",
+                        self.name
+                    ));
+                }
+
+                if !has_nested && !has_direct {
+                    // Neither structure found - might be empty config
+                    log::debug!("No MCP servers configuration found in {} config", self.name);
+                }
+
+                Ok(())
+            }
+            ConfigStructure::Custom(expected) => {
+                // For custom structures, just log the expectation
+                log::debug!("Application '{}' uses custom structure: {}", self.name, expected);
+                Ok(())
+            }
+        }
+    }
 }
 
 /// Configuration file formats supported by MCP applications
@@ -69,20 +155,57 @@ pub struct ApplicationMetadata {
     pub developer: String,
     /// Application category
     pub category: ApplicationCategory,
-    /// MCP protocol version supported
+    /// MCP protocol version supported (defaults to "1.0")
+    #[serde(default = "default_mcp_version")]
     pub mcp_version: String,
     /// Additional notes or special handling requirements
     pub notes: Option<String>,
     /// Whether this application requires special permissions
+    #[serde(default)]
     pub requires_permissions: bool,
+    /// Year the application was first released
+    #[serde(default)]
+    pub release_year: Option<u32>,
+    /// Official documentation URL
+    #[serde(default)]
+    pub official_docs_url: Option<String>,
+    /// MCP configuration documentation URL
+    #[serde(default)]
+    pub config_docs_url: Option<String>,
+    /// Support/help URL
+    #[serde(default)]
+    pub support_url: Option<String>,
+    /// Software license
+    #[serde(default)]
+    pub license: Option<String>,
+    /// Supported platforms
+    #[serde(default)]
+    pub platforms: Vec<String>,
+    /// Minimum version required for MCP support
+    #[serde(default)]
+    pub min_version: Option<String>,
+}
+
+fn default_mcp_version() -> String {
+    "1.0".to_string()
 }
 
 /// Categories of MCP-enabled applications
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ApplicationCategory {
-    CodeEditor,
+    #[serde(rename = "IDE")]
     IDE,
+    #[serde(rename = "AIAssistant")]
+    AIAssistant,
+    #[serde(rename = "DeveloperTool")]
+    DeveloperTool,
+    #[serde(rename = "Terminal")]
+    Terminal,
+    #[serde(rename = "CodeEditor")]
+    CodeEditor,
+    #[serde(rename = "ChatClient")]
     ChatClient,
+    #[serde(rename = "ProductivityTool")]
     ProductivityTool,
     Other(String),
 }
@@ -137,7 +260,83 @@ impl ApplicationRegistry {
             },
         }
     }
-    
+
+    /// Load registry from external JSON file
+    ///
+    /// Attempts to load application profiles from an external applications.json file.
+    /// This allows for configuration without recompilation.
+    pub fn from_json_file(path: &std::path::Path) -> anyhow::Result<Self> {
+        use std::fs;
+
+        let content = fs::read_to_string(path)?;
+        let json: serde_json::Value = serde_json::from_str(&content)?;
+
+        let mut applications = HashMap::new();
+
+        if let Some(apps_array) = json.get("applications").and_then(|a| a.as_array()) {
+            for app_json in apps_array {
+                let profile: ApplicationProfile = serde_json::from_value(app_json.clone())?;
+                applications.insert(profile.id.clone(), profile);
+            }
+        }
+
+        let application_count = applications.len();
+        let version = json.get("version")
+            .and_then(|v| v.as_str())
+            .unwrap_or("1.0.0")
+            .to_string();
+
+        Ok(Self {
+            applications,
+            metadata: RegistryMetadata {
+                version,
+                last_updated: chrono::Utc::now(),
+                application_count,
+            },
+        })
+    }
+
+    /// Create registry with automatic loading from external file if available
+    ///
+    /// Tries to load from these locations in order:
+    /// 1. ./resources/applications.json (development)
+    /// 2. Bundled resource (production)
+    /// 3. Falls back to hardcoded profiles
+    pub fn with_auto_load() -> Self {
+        // Try development path first
+        let dev_path = std::path::PathBuf::from("./resources/applications.json");
+        if dev_path.exists() {
+            if let Ok(registry) = Self::from_json_file(&dev_path) {
+                log::info!("Loaded application registry from development path");
+                return registry;
+            }
+        }
+
+        // Try relative to src-tauri directory
+        let src_tauri_path = std::path::PathBuf::from("./src-tauri/resources/applications.json");
+        if src_tauri_path.exists() {
+            if let Ok(registry) = Self::from_json_file(&src_tauri_path) {
+                log::info!("Loaded application registry from src-tauri path");
+                return registry;
+            }
+        }
+
+        // Try config directory
+        if let Some(config_dir) = dirs::config_dir() {
+            let config_path = config_dir.join("mcp-control").join("applications.json");
+            if config_path.exists() {
+                if let Ok(registry) = Self::from_json_file(&config_path) {
+                    log::info!("Loaded application registry from config directory");
+                    return registry;
+                }
+            }
+        }
+
+        // Fall back to hardcoded profiles
+        log::info!("Using hardcoded application profiles");
+        Self::new()
+    }
+
     /// Get Claude Desktop application profile
     fn claude_desktop_profile() -> ApplicationProfile {
         ApplicationProfile {
@@ -149,6 +348,7 @@ impl ApplicationRegistry {
                 "~/.config/claude/claude_desktop_config.json".to_string(),
             ],
             config_format: ConfigFormat::Json,
+            config_structure: ConfigStructure::DirectMcpServers,
             executable_paths: vec![
                 "/Applications/Claude.app".to_string(),
             ],
@@ -189,6 +389,7 @@ impl ApplicationRegistry {
                 "~/Library/Application Support/Cursor/User/globalStorage/settings.json".to_string(),
             ],
             config_format: ConfigFormat::Json,
+            config_structure: ConfigStructure::NestedMcpServers,
             executable_paths: vec![
                 "/Applications/Cursor.app".to_string(),
             ],
@@ -229,6 +430,7 @@ impl ApplicationRegistry {
                 "~/.config/zed/settings.json".to_string(),
             ],
             config_format: ConfigFormat::Json,
+            config_structure: ConfigStructure::DirectMcpServers,
             executable_paths: vec![
                 "/Applications/Zed.app".to_string(),
             ],
@@ -270,6 +472,7 @@ impl ApplicationRegistry {
                 "~/Library/Application Support/Code - Insiders/User/settings.json".to_string(),
             ],
             config_format: ConfigFormat::Json,
+            config_structure: ConfigStructure::DirectMcpServers,
             executable_paths: vec![
                 "/Applications/Visual Studio Code.app".to_string(),
             ],
@@ -311,6 +514,7 @@ impl ApplicationRegistry {
                 "~/Library/Application Support/continue/config.json".to_string(),
             ],
             config_format: ConfigFormat::Json,
+            config_structure: ConfigStructure::DirectMcpServers,
             executable_paths: vec![
                 "/Applications/Continue.app".to_string(),
             ],
@@ -351,6 +555,7 @@ impl ApplicationRegistry {
                 "~/Library/Application Support/Amazon Q/config.json".to_string(),
             ],
             config_format: ConfigFormat::Json,
+            config_structure: ConfigStructure::DirectMcpServers,
             executable_paths: vec![
                 "/Applications/Amazon Q.app".to_string(),
             ],
@@ -392,6 +597,7 @@ impl ApplicationRegistry {
                 "~/.config/warp/mcp_config.json".to_string(),
             ],
             config_format: ConfigFormat::Json,
+            config_structure: ConfigStructure::NestedMcpServers,
             executable_paths: vec![
                 "/Applications/Warp.app".to_string(),
             ],
@@ -433,6 +639,7 @@ impl ApplicationRegistry {
                 "~/Library/Application Support/Claude Code/config.json".to_string(),
             ],
             config_format: ConfigFormat::Json,
+            config_structure: ConfigStructure::DirectMcpServers,
             executable_paths: vec![
                 "/usr/local/bin/claude".to_string(),
                 "/opt/homebrew/bin/claude".to_string(),
@@ -474,6 +681,7 @@ impl ApplicationRegistry {
                 "~/Library/Application Support/JetBrains/IdeaIC/mcp_settings.json".to_string(),
             ],
             config_format: ConfigFormat::Json,
+            config_structure: ConfigStructure::NestedMcpServers,
             executable_paths: vec![
                 "/Applications/IntelliJ IDEA.app".to_string(),
             ],
@@ -515,6 +723,7 @@ impl ApplicationRegistry {
                 "~/.config/JetBrains/PhpStorm/mcp_settings.json".to_string(),
             ],
             config_format: ConfigFormat::Json,
+            config_structure: ConfigStructure::NestedMcpServers,
             executable_paths: vec![
                 "/Applications/PhpStorm.app".to_string(),
             ],
@@ -555,6 +764,7 @@ impl ApplicationRegistry {
                 "~/.config/JetBrains/WebStorm/mcp_settings.json".to_string(),
             ],
             config_format: ConfigFormat::Json,
+            config_structure: ConfigStructure::NestedMcpServers,
             executable_paths: vec![
                 "/Applications/WebStorm.app".to_string(),
             ],
@@ -596,6 +806,7 @@ impl ApplicationRegistry {
                 "~/Library/Application Support/JetBrains/PyCharmCE/mcp_settings.json".to_string(),
             ],
             config_format: ConfigFormat::Json,
+            config_structure: ConfigStructure::NestedMcpServers,
             executable_paths: vec![
                 "/Applications/PyCharm.app".to_string(),
             ],

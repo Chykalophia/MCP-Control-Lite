@@ -981,12 +981,26 @@ async fn save_server_config(server_id: String, application: String, config: serd
 const MCP_CONTROL_LITE_NAME: &str = "MCP Control Lite";
 const NONE_SOURCE: &str = "none";
 
-/// Determine if an application uses nested mcp.servers structure
-fn uses_nested_config_structure(profile_id: &str) -> bool {
-    // Configuration-based approach: check if the profile ID matches known patterns
-    profile_id == "cursor" ||
-    profile_id == "warp" ||
-    profile_id.starts_with("jetbrains-")
+/// Read and validate an application config file
+///
+/// Reads the config file, parses it as JSON, and validates the structure matches
+/// the application profile's declared config structure. Logs warnings on mismatch.
+async fn read_and_validate_config(
+    config_path: &std::path::Path,
+    profile: &mcpctl_lib::detection::ApplicationProfile,
+) -> Result<serde_json::Value, String> {
+    let content = tokio::fs::read_to_string(config_path).await
+        .map_err(|e| format!("Failed to read config: {}", e))?;
+
+    let config: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse config: {}", e))?;
+
+    // Validate config structure matches profile declaration
+    if let Err(validation_error) = profile.validate_config_structure(&config) {
+        log::warn!("Config structure validation warning: {}", validation_error);
+    }
+
+    Ok(config)
 }
 
 /// Read MCP Control Lite's internal configuration
@@ -1049,10 +1063,8 @@ async fn sync_from_source(source_app: String) -> Result<String, String> {
         let config_path = source_result.found_paths.config_file.as_ref()
             .ok_or("Source application has no config file")?;
 
-        let content = tokio::fs::read_to_string(config_path).await
-            .map_err(|e| format!("Failed to read source config: {}", e))?;
-        let config: serde_json::Value = serde_json::from_str(&content)
-            .map_err(|e| format!("Failed to parse source config: {}", e))?;
+        // Read and validate config structure
+        let config = read_and_validate_config(config_path, &source_result.profile).await?;
 
         config.get("mcpServers")
             .or_else(|| config.get("mcp").and_then(|m| m.get("servers")))
@@ -1070,15 +1082,12 @@ async fn sync_from_source(source_app: String) -> Result<String, String> {
         }
 
         if let Some(config_path) = &result.found_paths.config_file {
-            // Read target config
-            let content = tokio::fs::read_to_string(config_path).await
+            // Read and validate target config
+            let mut target_config = read_and_validate_config(config_path, &result.profile).await
                 .map_err(|e| format!("Failed to read {}: {}", result.profile.name, e))?;
 
-            let mut target_config: serde_json::Value = serde_json::from_str(&content)
-                .map_err(|e| format!("Failed to parse {}: {}", result.profile.name, e))?;
-
-            // Use configuration-based approach to determine structure
-            if uses_nested_config_structure(&result.profile.id) {
+            // Use profile metadata to determine structure
+            if result.profile.uses_nested_config() {
                 // Ensure mcp.servers structure exists
                 if target_config.get("mcp").is_none() {
                     target_config["mcp"] = serde_json::json!({});
